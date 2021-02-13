@@ -1,0 +1,19 @@
+{
+    "MySQL": {
+        "host": "10.0.1.78",
+        "port": 3306,
+        "database": "IoBroker",
+        "user": "iobroker",
+        "password": "Alexaoli.1"
+    },
+    "InfluxDB": {
+        "host": "10.0.1.104",
+        "ssl": false,
+        "port": 8086,
+        "database": "iobroker",
+        "retention_policy": "autogen",
+        "user": "Oliver",
+        "password": "Oll!Sued1991",
+        "store_ack_boolean": true
+    }
+}
