@@ -66,7 +66,7 @@ print("")
 # dictates how columns will be mapped to key/fields in InfluxDB
 SCHEMA = {
     "time_column": "time", # the column that will be used as the time stamp in influx
-    "columns_to_fields" : ["ack","q", "from","value"], # columns that will map to fields 
+    "columns_to_fields" : ["ack","q", "from","value"], # columns that will map to fields
     # "columns_to_tags" : ["",...], # columns that will map to tags
     "table_name_to_measurement" : "name", # table name that will be mapped to measurement
     }
@@ -78,7 +78,7 @@ SCHEMA = {
 def generate_influx_points(records):
     influx_points = []
     for record in records:
-        #tags = {}, 
+        #tags = {},
         fields = {}
         #for tag_label in SCHEMA['columns_to_tags']:
         #   tags[tag_label] = record[tag_label]
@@ -106,17 +106,17 @@ def query_metrics(table):
 
 def migrate_datapoints(table):
     query_max_rows = 100000 # prevent run out of mermory limit on SQL DB
-    process_max_rows = 1000     
-    
-    migrated_datapoints = 0    
+    process_max_rows = 1000
+
+    migrated_datapoints = 0
     metrics = query_metrics(table)
     metric_nr = 0
-    metric_count = str(len(metrics))
+    metric_count = len(metrics)
     processed_rows = 0
     for metric in metrics:
         metric_nr += 1
-        print(metric['name'] + "(ID: " + str(metric['id']) + ")" + " (" + str(metric_nr) + "/" + str(metric_count) + ")")
-        
+        print(metric['name'] + "(ID: " + str(metric['id']) + ")" + " (" + str(metric_nr) + "/" + str(metric_count) + ")["+str(round((metric_nr/metric_count)*100,2))+"&]")
+
         start_row = 0
         processed_rows = 0
         while True:
@@ -135,14 +135,15 @@ def migrate_datapoints(table):
             MYSQL_CURSOR.execute(query)
             if MYSQL_CURSOR.rowcount == 0:
                 break
-            
+
             # process x records at a time
-            while True:            
+            while True:
                 selected_rows = MYSQL_CURSOR.fetchmany(process_max_rows)
                 if len(selected_rows) == 0:
                     break
-                
-                print(f"Processing row {processed_rows + 1:,} to {processed_rows + len(selected_rows):,} from LIMIT {start_row:,} / {start_row + query_max_rows:,} " + table + " - " + metric['name'] + " (" + str(metric_nr) + "/" + str(metric_count) + ")")
+
+                print(f"Processing row {processed_rows + 1:,} to {processed_rows + len(selected_rows):,} from LIMIT {start_row:,} / {start_row + query_max_rows:,} " + table + " - " + metric['name'] + " (" + str(metric_nr) + "/" + str(metric_count) + ")["+str(round((metric_nr/metric_count)*100, 2))+"&]")
+
                 migrated_datapoints += len(selected_rows)
 
                 try:
@@ -150,16 +151,16 @@ def migrate_datapoints(table):
                 except Exception as ex:
                     print("InfluxDB error")
                     print(ex)
-                    sys.exit(1)               
-                
+                    sys.exit(1)
+
                 processed_rows += len(selected_rows)
-                
+
             start_row += query_max_rows
         print("")
-        
+
     return migrated_datapoints
 
-MYSQL_CURSOR = MYSQL_CONNECTION.cursor(cursor=pymysql.cursors.DictCursor) 
+MYSQL_CURSOR = MYSQL_CONNECTION.cursor(cursor=pymysql.cursors.DictCursor)
 migrated = 0
 migrated += migrate_datapoints("ts_number")
 migrated += migrate_datapoints("ts_bool")
