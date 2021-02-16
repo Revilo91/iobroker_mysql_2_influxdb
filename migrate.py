@@ -153,7 +153,7 @@ def migrate_datapoints(table):
                 except Exception as ex:
                     print("InfluxDB error")
                     print(ex)
-                    sys.exit(1)
+                    #sys.exit(1)
 
                 processed_rows += len(selected_rows)
 
