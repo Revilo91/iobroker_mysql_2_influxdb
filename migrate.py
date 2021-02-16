@@ -117,7 +117,7 @@ def migrate_datapoints(table):
     processed_rows = 0
     for metric in metrics:
         metric_nr += 1
-        print(metric['name'] + "(ID: " + str(metric['id']) + ")" + " (" + str(metric_nr) + "/" + str(metric_count) + ")["+str(round((metric_nr/metric_count)*100, 2))+"&]")
+        print(metric['name'] + "(ID: " + str(metric['id']) + ")" + " (" + str(metric_nr) + "/" + str(metric_count) + ")["+str(round((metric_nr/metric_count)*100, 2))+"%]")
 
         start_row = 0
         processed_rows = 0
@@ -125,9 +125,9 @@ def migrate_datapoints(table):
             query = """SELECT d.name,
                         m.ack AS 'ack',
                         (m.q*1.0) AS 'q',
-                        s.name AS "from",
+                        s.name AS 'from',
                         (m.val*1.0) AS 'value',
-                        (m.ts*1000000) AS'time'
+                        (m.ts*1000000) AS 'time'
                         FROM """ + table + """ AS m
                         LEFT JOIN datapoints AS d ON m.id=d.id
                         LEFT JOIN sources AS s ON m._from=s.id
@@ -144,7 +144,7 @@ def migrate_datapoints(table):
                 if len(selected_rows) == 0:
                     break
 
-                print(f"Processing row {processed_rows + 1:,} to {processed_rows + len(selected_rows):,} from LIMIT {start_row:,} / {start_row + query_max_rows:,} " + table + " - " + metric['name'] + " (" + str(metric_nr) + "/" + str(metric_count) + ")["+str(round((metric_nr/metric_count)*100, 2))+"&]")
+                print(f"Processing row {processed_rows + 1:,} to {processed_rows + len(selected_rows):,} from LIMIT {start_row:,} / {start_row + query_max_rows:,} " + table + " - " + metric['name'] + " (" + str(metric_nr) + "/" + str(metric_count) + ")["+str(round((metric_nr/metric_count)*100, 2))+"%]")
 
                 migrated_datapoints += len(selected_rows)
 
