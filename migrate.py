@@ -1,7 +1,7 @@
 import json
 import os
 import sys
-import time
+from datetime import datetime
 from influxdb import InfluxDBClient
 import pymysql
 
@@ -119,56 +119,64 @@ def migrate_datapoints(table):
         metric_nr += 1
         print(metric['name'] + "(ID: " + str(metric['id']) + ")" + " (" + str(metric_nr) + "/" + str(metric_count) + ")["+str(round((metric_nr/metric_count)*100, 2))+"%]")
 
-        start_row = 0
+        #start_row = 0
         processed_rows = 0
+        query = """SELECT d.name,
+                    m.ack AS 'ack',
+                    (m.q*1.0) AS 'q',
+                    s.name AS 'from',
+                    (m.val*1.0) AS 'value',
+                    (m.ts*1000000) AS 'time'
+                    FROM """ + table + """ AS m
+                    LEFT JOIN datapoints AS d ON m.id=d.id
+                    LEFT JOIN sources AS s ON m._from=s.id
+                    WHERE q=0 AND d.id = """ + str(metric['id'])
+                    # ORDER BY m.ts desc
+                    # LIMIT """ + str(start_row) + """, """ + str(query_max_rows)
+        #print(f"Execute: {query}")
+        startTime = datetime.now()
+        print(f"Start Execute: {startTime.strftime(r'%Y-%m-%d %H:%M:%S')}")
+        firstTimeAppear = 1
+        MYSQL_CURSOR.execute(query)
+        print(f"Execute Duration: {datetime.now() - startTime}")
+        if MYSQL_CURSOR.rowcount == 0:
+            break
+
+        # process x records at a time
         while True:
-            query = """SELECT d.name,
-                        m.ack AS 'ack',
-                        (m.q*1.0) AS 'q',
-                        s.name AS 'from',
-                        (m.val*1.0) AS 'value',
-                        (m.ts*1000000) AS 'time'
-                        FROM """ + table + """ AS m
-                        LEFT JOIN datapoints AS d ON m.id=d.id
-                        LEFT JOIN sources AS s ON m._from=s.id
-                        WHERE q=0 AND d.id = """ + str(metric['id']) + """
-                        ORDER BY m.ts desc
-                        LIMIT """ + str(start_row) + """, """ + str(query_max_rows)
-            MYSQL_CURSOR.execute(query)
-            if MYSQL_CURSOR.rowcount == 0:
+            startTime = datetime.now()
+            #print(f"Fetchmany: {startTime.strftime(r'%Y-%m-%d %H:%M:%S')}")
+            selected_rows = MYSQL_CURSOR.fetchmany(process_max_rows)
+            #print(f"Fetchmany Duration: {datetime.now() - startTime}")
+            if len(selected_rows) == 0:
                 break
 
-            # process x records at a time
-            while True:
-                selected_rows = MYSQL_CURSOR.fetchmany(process_max_rows)
-                if len(selected_rows) == 0:
-                    break
+            print(f"Processing row {processed_rows + 1:,} to {processed_rows + len(selected_rows):,} " + table + " - " + metric['name'] + " (" + str(metric_nr) + "/" + str(metric_count) + ")["+str(round((metric_nr/metric_count)*100, 2))+"%]")
 
-                print(f"Processing row {processed_rows + 1:,} to {processed_rows + len(selected_rows):,} from LIMIT {start_row:,} / {start_row + query_max_rows:,} " + table + " - " + metric['name'] + " (" + str(metric_nr) + "/" + str(metric_count) + ")["+str(round((metric_nr/metric_count)*100, 2))+"%]")
+            migrated_datapoints += len(selected_rows)
 
-                migrated_datapoints += len(selected_rows)
+            try:
+                INFLUXDB_CONNECTION.write_points(generate_influx_points(selected_rows), retention_policy=db['InfluxDB']['retention_policy'], batch_size=query_max_rows)
+            except Exception as ex:
+                print("InfluxDB error")
+                print(ex)
+                # sys.exit(1)
 
-                try:
-                    INFLUXDB_CONNECTION.write_points(generate_influx_points(selected_rows), retention_policy=db['InfluxDB']['retention_policy'])
-                except Exception as ex:
-                    print("InfluxDB error")
-                    print(ex)
-                    #sys.exit(1)
+            processed_rows += len(selected_rows)
 
-                processed_rows += len(selected_rows)
-
-            start_row += query_max_rows
+        #start_row += query_max_rows
         print("")
 
     return migrated_datapoints
 
-
+START = datetime.now()
 MYSQL_CURSOR = MYSQL_CONNECTION.cursor(cursor=pymysql.cursors.DictCursor)
 migrated = 0
 migrated += migrate_datapoints("ts_number")
 migrated += migrate_datapoints("ts_bool")
 migrated += migrate_datapoints("ts_string")
 print(f"Migrated: {migrated:,}")
+print(f"Full Duration: {datetime.now() - START}")
 
 
 MYSQL_CONNECTION.close()
